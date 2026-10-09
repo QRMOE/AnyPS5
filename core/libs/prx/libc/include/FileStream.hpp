@@ -2,6 +2,7 @@
 #define CORE_LIBS_PRX_LIBC_INCLUDE_FILESTREAM_HPP
 
 #include <cstdio>
+#include <cstring>
 #include <stdexcept>
 #include <utility>
 #include <cstdint>
@@ -39,10 +40,12 @@ class FileStream {
     std::byte _reserved[256 - sizeof(GuestFilePrefix)]{};
     std::FILE* _handle;
     bool _dynamic;
-    bool encodingError = false;
+    bool libraryError = false;
+    bool readable;
 
 public:
-    explicit FileStream(std::FILE* handle, bool dynamic = false) : _handle(handle), _dynamic(dynamic) {
+    explicit FileStream(std::FILE* handle, bool dynamic = false, const char* mode = nullptr)
+        : _handle(handle), _dynamic(dynamic), readable(mode ? mode[0] == 'r' || std::strchr(mode, '+') : handle != stdout && handle != stderr) {
         if (!_handle) throw std::runtime_error("FileStream: null handle");
         _guest.flags = handle == stdin ? 4 : handle == stdout || handle == stderr ? 8 : 0x10;
 #ifdef _WIN32
@@ -65,13 +68,16 @@ public:
         return _dynamic;
     }
 
+    bool CanRead() const { return readable; }
+
     GuestFilePrefix& GuestState() { return _guest; }
     bool Reopen(const char* filename, const char* mode) {
         auto* previous = GetHandle();
         _guest = {};
-        encodingError = false;
+        libraryError = false;
         _handle = std::freopen(filename, mode, previous);
         if (!_handle) return false;
+        readable = mode[0] == 'r' || std::strchr(mode, '+');
         _guest.flags = 0x10;
 #ifdef _WIN32
         const int descriptor = _fileno(_handle);
@@ -85,17 +91,19 @@ public:
         _guest.readRemaining = 0;
         _guest.writeRemaining = 0;
         _guest.flags = static_cast<std::int16_t>((_guest.flags & ~0x60) |
-            (std::feof(GetHandle()) ? 0x20 : 0) | (std::ferror(GetHandle()) || encodingError ? 0x40 : 0));
+            (std::feof(GetHandle()) ? 0x20 : 0) | (std::ferror(GetHandle()) || libraryError ? 0x40 : 0));
     }
 
-    void SetEncodingError() {
-        encodingError = true;
+    void SetError() {
+        libraryError = true;
         SyncStatus();
     }
 
+    void SetEncodingError() { SetError(); }
+
     void ClearError() {
         std::clearerr(GetHandle());
-        encodingError = false;
+        libraryError = false;
         SyncStatus();
     }
 
