@@ -10,6 +10,7 @@ target_sources(libc PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/WideConversion.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/Multibyte.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/StringExtensions.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/MemorySearch.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/Math.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/Time.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/FileAndHeap.cpp
@@ -46,6 +47,16 @@ if(WIN32)
 endif()
 
 if(BUILD_TESTING)
+    add_test_executable(guest_memmem_tests ${LIBS_INCLUDE_DIR}/tests/GuestMemmem.cpp)
+    target_include_directories(guest_memmem_tests PRIVATE ${LIBS_INCLUDE_DIR})
+    target_link_libraries(guest_memmem_tests PRIVATE libc)
+    configure_windows_unwind(guest_memmem_tests)
+    add_test(NAME guest_memmem COMMAND guest_memmem_tests)
+    set_tests_properties(guest_memmem PROPERTIES TIMEOUT 20)
+    if(WIN32)
+        set_tests_properties(guest_memmem PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
     add_test_executable(guest_time_conversion_tests ${LIBS_INCLUDE_DIR}/tests/GuestTimeConversion.cpp)
     target_include_directories(guest_time_conversion_tests PRIVATE ${LIBS_INCLUDE_DIR})
     target_link_libraries(guest_time_conversion_tests PRIVATE libc)
