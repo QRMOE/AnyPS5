@@ -47,7 +47,7 @@ FileStream* APS5_VABI fdopen_nid_postfix(int descriptor, const char* mode) {
         auto* native = ::fdopen(descriptor, mode);
 #endif
         if (!native) return nullptr;
-        auto* stream = new (storage.get()) FileStream(native, true);
+        auto* stream = new (storage.get()) FileStream(native, true, mode);
         storage.release();
         return stream;
     } catch (const std::bad_alloc&) { errno = 12; return nullptr; }
@@ -104,7 +104,7 @@ FileStream* APS5_VABI fopen_nid_postfix(const char* filename, const char* mode) 
     }
     // APS5_LOG_OUT("success: \"%s\"", abs_path.c_str());
     if (WritesFile(mode)) RecordWrittenPath_nid_no_patch(fpath);
-    auto stream = std::make_unique<FileStream>(handle.get(), true);
+    auto stream = std::make_unique<FileStream>(handle.get(), true, mode);
     handle.release();
     return stream.release();
 }
