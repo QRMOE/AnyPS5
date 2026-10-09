@@ -15,6 +15,7 @@ target_sources(libc PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/FileAndHeap.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/StdioExtras.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/StandardStreams.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/LineInput.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/GuestAllocations.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/GuestArena.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/GuestWriteWatch.cpp
@@ -46,6 +47,17 @@ if(WIN32)
 endif()
 
 if(BUILD_TESTING)
+    add_test_executable(guest_line_input_tests ${LIBS_INCLUDE_DIR}/tests/GuestLineInput.cpp)
+    target_include_directories(guest_line_input_tests PRIVATE ${LIBS_INCLUDE_DIR})
+    target_link_libraries(guest_line_input_tests PRIVATE libc)
+    configure_windows_unwind(guest_line_input_tests)
+    add_test(NAME guest_line_input COMMAND guest_line_input_tests)
+    add_test(NAME guest_line_input_allocation_failure COMMAND guest_line_input_tests allocation-failure)
+    set_tests_properties(guest_line_input guest_line_input_allocation_failure PROPERTIES TIMEOUT 20)
+    if(WIN32)
+        set_tests_properties(guest_line_input guest_line_input_allocation_failure PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
     add_test_executable(guest_time_conversion_tests ${LIBS_INCLUDE_DIR}/tests/GuestTimeConversion.cpp)
     target_include_directories(guest_time_conversion_tests PRIVATE ${LIBS_INCLUDE_DIR})
     target_link_libraries(guest_time_conversion_tests PRIVATE libc)
