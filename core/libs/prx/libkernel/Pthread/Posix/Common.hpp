@@ -24,9 +24,16 @@ inline bool RelativeMicroseconds(int clockId, const KernelTimespec* abstime, Ker
     if (!abstime || abstime->tv_nsec < 0 || abstime->tv_nsec >= 1000000000) return false;
     KernelTimespec now{};
     clock_gettime_nid_postfix(clockId, &now);
-    const auto deadline = std::chrono::seconds(abstime->tv_sec) + std::chrono::nanoseconds(abstime->tv_nsec);
-    const auto current = std::chrono::seconds(now.tv_sec) + std::chrono::nanoseconds(now.tv_nsec);
-    const auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(deadline - current).count();
+    if (abstime->tv_sec < now.tv_sec) {
+        *usec = 0;
+        return true;
+    }
+    const auto seconds = static_cast<std::uint64_t>(abstime->tv_sec) - static_cast<std::uint64_t>(now.tv_sec);
+    if (seconds > std::numeric_limits<KernelUseconds>::max() / 1000000u + 1u) {
+        *usec = std::numeric_limits<KernelUseconds>::max();
+        return true;
+    }
+    const auto remaining = (static_cast<std::int64_t>(seconds) * 1000000000 + abstime->tv_nsec - now.tv_nsec) / 1000;
     *usec = remaining <= 0 ? 0 : remaining >= std::numeric_limits<KernelUseconds>::max() ? std::numeric_limits<KernelUseconds>::max() : static_cast<KernelUseconds>(remaining);
     return true;
 }
