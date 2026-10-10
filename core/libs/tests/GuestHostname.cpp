@@ -3,14 +3,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <string>
+#include <limits>
+#include <string_view>
 #include <thread>
 #include <vector>
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 extern "C" {
 int APS5_VABI gethostname_nid_postfix(char*, std::size_t);
@@ -26,15 +22,7 @@ static void Require(bool condition, int line) {
 #define Check(value) Require((value), __LINE__)
 
 int main() {
-    std::array<char, 1024> native{};
-#ifdef _WIN32
-    DWORD size = native.size();
-    Check(GetComputerNameExA(ComputerNameDnsHostname, native.data(), &size));
-#else
-    Check(::gethostname(native.data(), native.size()) == 0);
-#endif
-    const std::string expected = native.data();
-    Check(!expected.empty());
+    constexpr std::string_view expected = "AnyPS5";
     for (std::size_t length = 0; length <= expected.size() + 2; ++length) {
         std::vector<char> buffer(length + 2, '#');
         *__error_nid_postfix() = 71;
@@ -45,17 +33,27 @@ int main() {
             Check(std::memcmp(buffer.data() + 1, expected.data(), length) == 0);
         } else {
             Check(result == 0 && *__error_nid_postfix() == 71);
-            Check(std::strcmp(buffer.data() + 1, expected.c_str()) == 0);
+            Check(std::strcmp(buffer.data() + 1, expected.data()) == 0);
             for (std::size_t index = expected.size() + 2; index < buffer.size(); ++index) Check(buffer[index] == '#');
         }
     }
+    std::array<char, expected.size() + 3> oversized;
+    oversized.fill('#');
+    *__error_nid_postfix() = 71;
+    Check(gethostname_nid_postfix(oversized.data() + 1, std::numeric_limits<std::size_t>::max()) == 0);
+    Check(*__error_nid_postfix() == 71);
+    Check(std::strcmp(oversized.data() + 1, expected.data()) == 0);
+    Check(oversized.front() == '#' && oversized.back() == '#');
     *__error_nid_postfix() = 22;
     Check(gethostname_nid_postfix(nullptr, 0) == 0 && *__error_nid_postfix() == 22);
     Check(gethostname_nid_postfix(nullptr, 1024) == 0 && *__error_nid_postfix() == 22);
-    std::thread worker([] {
+    std::thread worker([expected] {
         char byte = '#';
         *__error_nid_postfix() = 0;
         Check(gethostname_nid_postfix(&byte, 0) == -1 && *__error_nid_postfix() == 63 && byte == '#');
+        std::array<char, expected.size() + 1> name{};
+        Check(gethostname_nid_postfix(name.data(), name.size()) == 0);
+        Check(std::strcmp(name.data(), expected.data()) == 0 && *__error_nid_postfix() == 63);
     });
     worker.join();
     Check(*__error_nid_postfix() == 22);
