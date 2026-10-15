@@ -138,7 +138,7 @@ static void AttributeClockValidation() {
         Require(pthread_condattr_destroy_nid_postfix(&attr) == 0 && attr == nullptr);
         Require(scePthreadMutexInit(&signalled.mutex, nullptr, nullptr) == 0);
         Require(scePthreadMutexLock(&signalled.mutex) == 0);
-        const KernelTimespec expired{-1, 0};
+        const KernelTimespec expired{0, 0};
         Require(pthread_cond_timedwait_nid_postfix(&signalled.cond, &signalled.mutex, &expired) == POSIX_ETIMEDOUT);
         RequireHeldByCaller(signalled);
         Require(scePthreadMutexUnlock(&signalled.mutex) == 0);
