@@ -257,6 +257,18 @@ void dropTransient(TextureCache& cache, VkDevice device = VK_NULL_HANDLE) {
     }
 }
 
+void dropTransientBefore(TextureCache& cache, std::uint64_t present) {
+    for (auto it = cache.transient.begin(); it != cache.transient.end();) {
+        if (it->second.present >= present) {
+            ++it;
+            continue;
+        }
+        cache.transientBytes -= it->second.bytes.size();
+        if (it->second.texture.use_count() > 1) noteReleased(it->second.texture);
+        it = cache.transient.erase(it);
+    }
+}
+
 void dropUncachedViews(TextureCache& cache) {
     auto& uncached = Uncached();
     if (!uncached.any.load(std::memory_order_acquire)) return;
@@ -937,7 +949,7 @@ std::shared_ptr<Texture> cachedTexture(const Context& context, std::span<const s
     const CacheHold held(sampledCacheHeld);
     dropUncachedViews(cache);
     if (const auto present = Recorder::Presents(); cache.transientPresent != present) {
-        dropTransient(cache);
+        dropTransientBefore(cache, cache.transientPresent);
         cache.transientPresent = present;
     }
     const auto serves = [&](CachedTexture& entry, bool transient) {
@@ -1007,6 +1019,8 @@ std::shared_ptr<Texture> cachedTexture(const Context& context, std::span<const s
                 cache.entries.push_front(std::move(entry));
                 cache.index[key] = cache.entries.begin();
                 if (viewed != nullptr) cache.views.emplace(viewed, cache.entries.begin());
+            } else {
+                found->second.present = Recorder::Presents();
             }
             return texture;
         }

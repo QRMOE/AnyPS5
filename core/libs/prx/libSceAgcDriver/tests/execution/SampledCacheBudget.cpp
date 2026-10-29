@@ -843,7 +843,7 @@ void frameTests(const Context& context) {
         const auto again = Sampled(context, block.Surface(surface));
         hits += again == made[surface].lock();
     }
-    Require(hits == capacity, "the next frame over the same " + std::to_string(frame) + " textures found " + std::to_string(hits) + " of them cached, not the " + std::to_string(capacity) + " the cache kept");
+    Require(hits == frame, "the next frame over the same " + std::to_string(frame) + " textures found " + std::to_string(hits) + " of them, not the " + std::to_string(capacity) + " the cache kept and the " + std::to_string(frame - capacity) + " it refused in the frame before");
     auto refused = Sampled(context, block.Surface(frame - 1u));
     Require(Sampled(context, block.Surface(frame - 1u)) == refused, "a texture refused by a cache full of this frame's textures was rebuilt on its second use in the frame");
     Require(TextureCacheUsage().sampledEntries == capacity && TextureCacheUsage().sampledBytes <= Budget, "the texture used a second time left the cache over its budget");
@@ -945,8 +945,15 @@ void refusedReuseTests(const Context& context) {
     Require(changed != refused, "a refused texture was reused after its guest memory changed in the same frame");
     Require(Sampled(context, address) == changed, "the texture rebuilt after a guest write was not reused for the rest of the frame");
     Recorder::CountPresent();
+    for (std::size_t surface = 0; surface < capacity; ++surface) Sampled(context, block.Surface(surface));
+    Require(Sampled(context, address) == changed, "a refused texture the next frame used again was rebuilt");
+    Require(TextureCacheUsage().sampledEntries == capacity && TextureCacheUsage().sampledBytes <= Budget, "a refused texture reused in the next frame took the cache over its budget");
+    Recorder::CountPresent();
     Sampled(context, block.Surface(0));
-    Require(changed->Released(), "a refused texture kept for its frame was not marked released when the frame ended");
+    Require(!changed->Released(), "a refused texture used in the frame that just ended was released at its present");
+    Recorder::CountPresent();
+    Sampled(context, block.Surface(0));
+    Require(changed->Released(), "a refused texture no frame used since was not marked released when the next frame ended");
     ClearCachedTextures(context.device);
 }
 
