@@ -28,6 +28,7 @@
 
 namespace AgcDriver {
 class TraceThread;
+std::uint64_t HostMemoryMiB();
 }
 
 extern "C" bool AgcDriverTraceRecording_nid_postfix();

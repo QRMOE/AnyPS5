@@ -424,3 +424,11 @@ void PerformanceTrace::StopOutput() {
 }
 
 }
+
+namespace AgcDriver {
+
+std::uint64_t HostMemoryMiB() {
+    return memoryMiB();
+}
+
+}

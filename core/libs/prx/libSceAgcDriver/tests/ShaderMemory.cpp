@@ -464,6 +464,15 @@ bool compileResultMemoPixel(std::uint32_t value) {
     return hit;
 }
 
+void verifyResultMemoBudgetSizing() {
+    using namespace ShaderRecompiler;
+    constexpr std::uint64_t GiB = 1ull << 30u;
+    require(ResultMemoBudgetFor(32u * GiB) == 2u * GiB, "result memo budget sizing: 32 GiB of host memory did not give a 2 GiB budget");
+    require(ResultMemoBudgetFor(8u * GiB) == 512ull << 20u, "result memo budget sizing: 8 GiB of host memory did not give a 512 MiB budget");
+    require(ResultMemoBudgetFor(2u * GiB) == 256ull << 20u, "result memo budget sizing: 2 GiB of host memory went below the 256 MiB floor");
+    require(ResultMemoBudgetFor(256u * GiB) == 4u * GiB, "result memo budget sizing: 256 GiB of host memory went past the 4 GiB ceiling");
+}
+
 void verifyResultMemoBudgetThreads() {
     using namespace ShaderRecompiler;
     require(!compileResultMemoPixel(1u) && compileResultMemoPixel(1u), "result memo budget threads: the memo did not keep a result");
@@ -9389,6 +9398,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (argc == 2 && std::string_view(argv[1]) == "--result-memo-budget-threads") {
+            verifyResultMemoBudgetSizing();
             verifyResultMemoBudgetThreads();
             std::cout << "The result memo ends within its byte budget when results are inserted during a trim\n";
             return 0;
