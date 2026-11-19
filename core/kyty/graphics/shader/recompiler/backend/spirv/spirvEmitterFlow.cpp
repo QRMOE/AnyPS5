@@ -496,27 +496,6 @@ uint32_t EmitWqmU64(EmitterState& state, uint32_t value) {
 	                          ConstantU64(state, 0x1111111111111111ull));
 	state.builder.AddFunction(spv::OpIMul, TypeU64(state), result, quad_bits,
 	                          ConstantU64(state, 15));
-#if defined(ANYPS5_KYTY)
-	if (state.program.stage == ShaderType::Pixel) {
-		state.builder.RequireCapability(spv::CapabilityGroupNonUniform);
-		state.builder.RequireCapability(spv::CapabilityGroupNonUniformBallot);
-		auto lanes = ConstantBool(state, true);
-		if (state.helper_invocation_variable != 0) {
-			const auto helper = state.builder.AllocateId();
-			state.builder.AddFunction(spv::OpLoad, TypeBool(state), helper, state.helper_invocation_variable);
-			lanes = state.builder.AllocateId();
-			state.builder.AddFunction(spv::OpLogicalNot, TypeBool(state), lanes, helper);
-		}
-		const auto active = EmitNative<spv::OpGroupNonUniformBallot, IR::Type::U32x4>(
-		    state, ConstantU32(state, spv::ScopeSubgroup), lanes);
-		const auto word = [&](uint32_t index) {
-			const auto bits = state.builder.AllocateId();
-			state.builder.AddFunction(spv::OpCompositeExtract, TypeU32(state), bits, active, index);
-			return bits;
-		};
-		return Binary(state, spv::OpBitwiseAnd, TypeU64(state), result, PackU64(state, word(0), word(1)));
-	}
-#endif
 	return result;
 }
 
