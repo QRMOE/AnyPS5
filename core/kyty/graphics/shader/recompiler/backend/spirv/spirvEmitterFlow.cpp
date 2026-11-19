@@ -496,6 +496,35 @@ uint32_t EmitWqmU64(EmitterState& state, uint32_t value) {
 	                          ConstantU64(state, 0x1111111111111111ull));
 	state.builder.AddFunction(spv::OpIMul, TypeU64(state), result, quad_bits,
 	                          ConstantU64(state, 15));
+#if defined(ANYPS5_KYTY)
+	if (state.program.stage == ShaderType::Pixel && state.helper_invocation_variable != 0) {
+		state.builder.RequireCapability(spv::CapabilityGroupNonUniform);
+		state.builder.RequireCapability(spv::CapabilityGroupNonUniformBallot);
+		const auto helper = state.builder.AllocateId();
+		state.builder.AddFunction(spv::OpLoad, TypeBool(state), helper, state.helper_invocation_variable);
+		const auto live = state.builder.AllocateId();
+		state.builder.AddFunction(spv::OpLogicalNot, TypeBool(state), live, helper);
+		const auto lanes = EmitNative<spv::OpGroupNonUniformBallot, IR::Type::U32x4>(
+		    state, ConstantU32(state, spv::ScopeSubgroup), live);
+		const auto word = [&](uint32_t index) {
+			const auto bits = state.builder.AllocateId();
+			state.builder.AddFunction(spv::OpCompositeExtract, TypeU32(state), bits, lanes, index);
+			return bits;
+		};
+		const auto low       = word(0);
+		const auto live_mask = PackU64(state, low, state.lane_count == 2 ? low : word(1));
+		const auto lane      = EmitSubgroupLocalInvocationId(state);
+		auto       own       = Binary(state, spv::OpShiftLeftLogical, TypeU64(state), ConstantU64(state, 1), lane);
+		if (state.lane_count == 2) {
+			own = Binary(state, spv::OpBitwiseOr, TypeU64(state), own,
+			             Binary(state, spv::OpShiftLeftLogical, TypeU64(state), ConstantU64(state, 1ull << 32u),
+			                    lane));
+		}
+		const auto keep = Select(state, TypeU64(state), helper,
+		                         Binary(state, spv::OpBitwiseOr, TypeU64(state), live_mask, own), live_mask);
+		return Binary(state, spv::OpBitwiseAnd, TypeU64(state), result, keep);
+	}
+#endif
 	return result;
 }
 
